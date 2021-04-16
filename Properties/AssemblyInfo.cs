@@ -10,7 +10,7 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
 [assembly: AssemblyProduct("TABRTreset")]
-[assembly: AssemblyCopyright("TABRTreset is a tool to crack encryption mechanism in game They Are Billions.\nIts initial purpose is to reset research tree. In fact TABRTreset is abbreviation for They Are Billions research tree reset.\nCurrently works on Steam Editon V.1.1.3 and ensures no backward compatibility.\n")]
+[assembly: AssemblyCopyright("TABRTreset is a tool to crack encryption mechanism in game They Are Billions.\nThe initial purpose of it is to reset research tree.In fact its fullname is They Are Billions research tree reset.\nCurrently works on Steam Editon V.1.1.3.It ensures no backward compatibility.\n")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 

@@ -22,50 +22,86 @@ namespace TAB_researchtreereset
         [Value(0, Required = true, MetaName = "save_name_or_path")]
         public string save_name_or_path { get; set; }
 
-        [Usage(ApplicationAlias = "TABRTreset")]
-        public static IEnumerable<Example> Examples
-        {
-            get => new List<Example>() { new Example(" ", new resetOption { save_name_or_path = "<save_name_or_path>" }) };
-        }
     }
     public class BaseOptionWithDatNameOrPath : BaseOption
     {
-        [Value(0, Required = true)]
+        [Value(0, Required = true, MetaName = "dat_name_or_path")]
         public string dat_name_or_path { get; set; }
     }
     public class BaseOptionWithSaveFolderNameOrPath : BaseOption
     {
-        [Value(0, Required = true)]
+        [Value(0, Required = true, MetaName = "save_folder_name_or_path")]
         public string save_folder_name_or_path { get; set; }
     }
     public class BaseOptionWithDatFolderNameOrPath : BaseOption
     {
-        [Value(0, Required = true)]
+        [Value(0, Required = true, MetaName = "dat_folder_name_or_path")]
         public string dat_folder_name_or_path { get; set; }
     }
 
     [Verb("reset", HelpText = "read the save, delete all researched technology, add coresponding research points and write back to save.")]
     public class resetOption : BaseOptionWithSaveNameOrPath
     {
+        [Usage(ApplicationAlias = "TABRTreset")]
+        public static IEnumerable<Example> Examples
+        {
+            get => new List<Example>() { new Example(typeof(resetOption).GetCustomAttribute<VerbAttribute>().HelpText + '\n', new resetOption { save_name_or_path = "<save_name_or_path>" }) };
+        }
     }
 
     [Verb("gencheck", HelpText = "generate .zxcheck for specific file")]
-    public class gencheckOption : BaseOptionWithSaveNameOrPath { }
+    public class gencheckOption : BaseOptionWithSaveNameOrPath
+    {
+        [Usage(ApplicationAlias = "TABRTreset")]
+        public static IEnumerable<Example> Examples
+        {
+            get => new List<Example>() { new Example(typeof(gencheckOption).GetCustomAttribute<VerbAttribute>().HelpText + '\n', new gencheckOption { save_name_or_path = "<save_name_or_path>" }) };
+        }
+    }
 
     [Verb("genpswd", HelpText = "generate all password of saves(*.zxsave) in savepswd.json, and generate all password of game data file(*.dat) in datpswd.json")]
     public class genpswdOption : BaseOption { }
 
     [Verb("unpacksave", HelpText = "unzip save(.zxsav) to a same name folder")]
-    public class unpacksaveOption : BaseOptionWithSaveNameOrPath { }
+    public class unpacksaveOption : BaseOptionWithSaveNameOrPath
+    {
+
+        [Usage(ApplicationAlias = "TABRTreset")]
+        public static IEnumerable<Example> Examples
+        {
+            get => new List<Example>() { new Example(typeof(unpacksaveOption).GetCustomAttribute<VerbAttribute>().HelpText + '\n', new unpacksaveOption { save_name_or_path = "<save_name_or_path>" }) };
+        }
+    }
 
     [Verb("unpackdat", HelpText = "unzip data(.dat) to a same name folder")]
-    public class unpackdatOption : BaseOptionWithDatNameOrPath { }
+    public class unpackdatOption : BaseOptionWithDatNameOrPath
+    {
+        [Usage(ApplicationAlias = "TABRTreset")]
+        public static IEnumerable<Example> Examples
+        {
+            get => new List<Example>() { new Example(typeof(unpackdatOption).GetCustomAttribute<VerbAttribute>().HelpText + '\n', new unpackdatOption { dat_name_or_path = "<dat_name_or_path>" }) };
+        }
+    }
 
     [Verb("packsave", HelpText = "zip folder to a same name .zxsav file with proper password, and generate .zxcheck")]
-    public class packsaveOption : BaseOptionWithSaveFolderNameOrPath { }
+    public class packsaveOption : BaseOptionWithSaveFolderNameOrPath
+    {
+        [Usage(ApplicationAlias = "TABRTreset")]
+        public static IEnumerable<Example> Examples
+        {
+            get => new List<Example>() { new Example(typeof(packsaveOption).GetCustomAttribute<VerbAttribute>().HelpText + '\n', new packsaveOption { save_folder_name_or_path = "<save_folder_name_or_path>" }) };
+        }
+    }
 
     [Verb("packdat", HelpText = "zip folder to a same name .dat file with proper password")]
-    public class packdatOption : BaseOptionWithDatFolderNameOrPath { }
+    public class packdatOption : BaseOptionWithDatFolderNameOrPath
+    {
+        [Usage(ApplicationAlias = "TABRTreset")]
+        public static IEnumerable<Example> Examples
+        {
+            get => new List<Example>() { new Example(typeof(packdatOption).GetCustomAttribute<VerbAttribute>().HelpText + '\n', new packdatOption { dat_folder_name_or_path = "<dat_folder_name_or_path>" }) };
+        }
+    }
 
     public static class ObjectExtension
     {
@@ -83,6 +119,7 @@ namespace TAB_researchtreereset
                 //interactive mode
                 Console.WriteLine("Input the name of save for research tree reseting");
                 var name = Console.ReadLine().Trim();
+                if (string.IsNullOrEmpty(name)) throw new ArgumentNullException();
                 Run(new resetOption { save_name_or_path = name });
                 Console.WriteLine("Succeeded. Press any key to continue");
                 Console.ReadKey();
