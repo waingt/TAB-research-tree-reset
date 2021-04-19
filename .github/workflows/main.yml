@@ -40,24 +40,13 @@ jobs:
         with:
           path: bin\Release
           name: Release.zip
-  
-  release:
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - name: Download a Build Artifact
-        uses: actions/download-artifact@v2.0.9
-        with:
-          name: Release.zip
-          path: artifact
           
-      - run: ls -R
-        working-directory: artifact
+      - run: tar -caf Release.zip -C bin\Release *
       
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: artifact/Release.zip
+          file: Release.zip
           tag: ${{ github.ref }}
           file_glob: true
