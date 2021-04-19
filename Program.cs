@@ -49,6 +49,15 @@ namespace TAB_researchtreereset
         }
     }
 
+    [Verb("resetperk", HelpText = "reset hero perks")]
+    public class resetperkOption : BaseOptionWithSaveNameOrPath
+    {
+        [Usage(ApplicationAlias = "TABRTreset")]
+        public static IEnumerable<Example> Examples
+        {
+            get => new List<Example>() { new Example(typeof(resetperkOption).GetCustomAttribute<VerbAttribute>().HelpText + '\n', new resetperkOption { save_name_or_path = "<save_name_or_path>" }) };
+        }
+    }
     [Verb("gencheck", HelpText = "generate .zxcheck for specific file")]
     public class gencheckOption : BaseOptionWithSaveNameOrPath
     {
@@ -109,6 +118,17 @@ namespace TAB_researchtreereset
             => obj.GetType().GetProperty(property_name).GetValue(obj);
         public static void SetProperty(this object obj, string property_name, object value)
             => obj.GetType().GetProperty(property_name).SetValue(obj, value);
+        public static void ModifyProperty(this object obj, string property_name, Func<object, object> func)
+        {
+            var p = obj.GetType().GetProperty(property_name);
+            p.SetValue(obj, func(p.GetValue(obj)));
+        }
+        public static void ModifyProperties(this object obj, Func<Dictionary<string, object>, Dictionary<string, object>> func)
+        {
+            var dict = obj.GetType().GetProperties().Where(p => p.CanWrite).ToDictionary(p => p.Name, p => p.GetValue(obj));
+            var modify = func(dict);
+            foreach (var pairs in modify) obj.SetProperty(pairs.Key, pairs.Value);
+        }
     }
     public static class Program
     {
@@ -140,6 +160,9 @@ namespace TAB_researchtreereset
             {
                 case resetOption o:
                     reset_research_tree(o.save_name_or_path);
+                    break;
+                case resetperkOption o:
+                    reset_hero_perk(o.save_name_or_path);
                     break;
                 case genpswdOption _:
                     generate_password();
@@ -194,7 +217,7 @@ namespace TAB_researchtreereset
             if (opt is BaseOptionWithSaveNameOrPath o)
                 o.save_name_or_path = Path.IsPathRooted(o.save_name_or_path) ? o.save_name_or_path : Path.Combine(o.save_folder, Path.GetFileNameWithoutExtension(o.save_name_or_path) + ".zxsav");
             else if (opt is BaseOptionWithDatNameOrPath odat)
-                odat.dat_name_or_path = Path.IsPathRooted(odat.dat_name_or_path) ? odat.dat_name_or_path : Path.Combine(odat.dat_name_or_path, Path.GetFileNameWithoutExtension(odat.dat_name_or_path) + ".dat");
+                odat.dat_name_or_path = Path.IsPathRooted(odat.dat_name_or_path) ? odat.dat_name_or_path : Path.Combine(odat.tab_folder, Path.GetFileNameWithoutExtension(odat.dat_name_or_path) + ".dat");
             else if (opt is BaseOptionWithSaveFolderNameOrPath osavefolder)
                 osavefolder.save_folder_name_or_path = Path.IsPathRooted(osavefolder.save_folder_name_or_path) ? osavefolder.save_folder_name_or_path : Path.Combine(osavefolder.save_folder, osavefolder.save_folder_name_or_path);
             else if (opt is BaseOptionWithDatFolderNameOrPath odatfolder)
@@ -212,17 +235,34 @@ namespace TAB_researchtreereset
         }
         static void reset_research_tree(string save_path)
         {
-            var dict = read_dat("ZXCampaign").Tables["Researchs"].Rows.Values.ToDictionary(v => v[0], v => int.Parse(v[1]));
+            var research_point_dict = read_dat("ZXCampaign").Tables["Researchs"].Rows.ToDictionary(p => p.Key, p => int.Parse(p.Value[1]));
             ZipSerializer.Current.Password = get_save_pswd(save_path);
             var zxgamestate = ZipSerializer.Read(save_path, "Data");
             var zxcampaignstate = zxgamestate.GetProperty("CampaignState");
-            int research_point_to_add = 0;
-            foreach (var t in (List<string>)zxcampaignstate.GetProperty("IDResearchUnlocked"))
-                research_point_to_add += dict[t];
-            zxcampaignstate.SetProperty("IDResearchUnlocked", new List<string>());
-            zxcampaignstate.SetProperty("IDResearchsRecentUnlocked", new List<string>());
-            zxcampaignstate.SetProperty("ResearchPoints", (int)zxcampaignstate.GetProperty("ResearchPoints") + research_point_to_add);
-            zxgamestate.SetProperty("CampaignState", zxcampaignstate);
+
+            zxcampaignstate.ModifyProperties(prop_dict => new Dictionary<string, object>()
+            {
+                ["IDResearchUnlocked"] = new List<string>(),
+                ["IDResearchsRecentUnlocked"] = new List<string>(),
+                ["ResearchPoints"] = (int)prop_dict["ResearchPoints"] + ((List<string>)prop_dict["IDResearchUnlocked"]).Sum(r => research_point_dict[r])
+            });
+
+            ZipSerializer.Write(save_path, "Data", zxgamestate);
+            generate_check(save_path);
+        }
+        static void reset_hero_perk(string save_path)
+        {
+            ZipSerializer.Current.Password = get_save_pswd(save_path);
+            var zxgamestate = ZipSerializer.Read(save_path, "Data");
+            var zxcampaignstate = zxgamestate.GetProperty("CampaignState");
+
+            zxcampaignstate.ModifyProperties(prop_dict => new Dictionary<string, object>()
+            {
+                ["HeroPerksTaken"] = new List<string>(),
+                ["HeroPerksAvailable"] = (int)prop_dict["HeroPerksAvailable"] + ((List<string>)prop_dict["HeroPerksTaken"]).Count,
+                ["HeroPerksTakenNow"] = new List<string>()
+            });
+
             ZipSerializer.Write(save_path, "Data", zxgamestate);
             generate_check(save_path);
         }
@@ -249,12 +289,12 @@ namespace TAB_researchtreereset
             var target_path = Path.Combine(Path.GetDirectoryName(save_path), Path.GetFileNameWithoutExtension(save_path));
             var t = new Ionic.Zip.ZipFile(save_path);
             t.Password = IsSave ? get_save_pswd(save_path) : get_dat_pswd(save_path);
-            t.ExtractAll(target_path);
+            t.ExtractAll(target_path, Ionic.Zip.ExtractExistingFileAction.OverwriteSilently);
         }
 
         static void pack(string folder_path, bool IsSave)
         {
-            var target_path = Path.ChangeExtension(folder_path.TrimEnd(Path.DirectorySeparatorChar), IsSave ? ".zxsave" : ".dat");
+            var target_path = Path.ChangeExtension(folder_path.TrimEnd(Path.DirectorySeparatorChar), IsSave ? ".zxsav" : ".dat");
             var t = new Ionic.Zip.ZipFile();
             t.Password = IsSave ? get_save_pswd(folder_path) : get_dat_pswd(folder_path);
             t.AddDirectory(folder_path);
