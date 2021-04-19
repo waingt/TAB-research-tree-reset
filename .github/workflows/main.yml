@@ -49,12 +49,15 @@ jobs:
         uses: actions/download-artifact@v2.0.9
         with:
           name: Release.zip
+          path: artifact
           
+      - run: ls -R
+        working-directory: artifact
+      
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: Release.zip
-          asset_name: Release.zip
+          file: artifact/Release.zip
           tag: ${{ github.ref }}
-          overwrite: true
+          file_glob: true
