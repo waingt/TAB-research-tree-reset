@@ -23,9 +23,7 @@ namespace TAB_researchtreereset
         [Option(Required = false, HelpText = @"specify the path to TAB game folder, default: (Steam installtion path)\steamapps\common\They Are Billions\")]
         public string tab_folder { get; set; }
         internal MethodInfo pswd_gen_method, check_gen_method;
-        public virtual void Run() { init(); }
-
-        public void init()
+        public virtual void Run()
         {
             try
             {
