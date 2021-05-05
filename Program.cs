@@ -1,11 +1,18 @@
 using CommandLine;
 using CommandLine.Text;
 using DXVision.Serialization;
+using Ionic.Zip;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Xml;
+
+[assembly: AssemblyVersion("2.0")]
+[assembly: AssemblyTitle("TABRTreset")]
+[assembly: AssemblyProduct("TABRTreset")]
+[assembly: AssemblyCopyright("TABRTreset is a tool to crack encryption mechanism in game They Are Billions.\nThe initial purpose of it is to reset research tree.In fact its fullname is They Are Billions research tree reset.\nCurrently works on Steam Editon V.1.1.3.It ensures no backward compatibility.\n")]
 
 namespace TAB_researchtreereset
 {
@@ -16,27 +23,133 @@ namespace TAB_researchtreereset
         [Option(Required = false, HelpText = @"specify the path to TAB game folder, default: (Steam installtion path)\steamapps\common\They Are Billions\")]
         public string tab_folder { get; set; }
         internal MethodInfo pswd_gen_method, check_gen_method;
+        public virtual void Run() { init(); }
+
+        public void init()
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(tab_folder))
+                    tab_folder = Path.Combine((string)Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Valve\Steam").GetValue("SteamPath"), @"steamapps\common\They Are Billions\");
+                if (!Directory.Exists(tab_folder)) throw new DirectoryNotFoundException(tab_folder);
+            }
+            catch (Exception e)
+            {
+                throw new Exception("cannot find TAB folder automatically\n consider specify TAB folder\n use \"TABRTreset help\" to get more help\n" + e.ToString(), e);
+            }
+            try
+            {
+                if (string.IsNullOrEmpty(save_folder))
+                    save_folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), @"My Games\They Are Billions\Saves\");
+                if (!Directory.Exists(save_folder)) throw new DirectoryNotFoundException(save_folder);
+            }
+            catch (Exception e) { throw new Exception("cannot find save folder automatically\n consider specify save folder\n use \"TABRTreset help\" to get more help\n" + e.ToString(), e); }
+
+            // TODO search for methods in TAB executive using method signatures & IL code instead of method names for backward compatibility
+            var tab_asmb = Assembly.LoadFrom(Path.Combine(tab_folder, "TheyAreBillions.exe"));
+            var serializer_class = tab_asmb.GetType("#=zBitRis$e$O2Cn5vz3w==");
+            pswd_gen_method = serializer_class.GetMethod("#=zAmh0ZrvDqn3lwW$PWQ==", BindingFlags.Static | BindingFlags.NonPublic) ?? throw new Exception("cannot find password generate method");
+            check_gen_method = serializer_class.GetMethod("#=zPYy9RcqnMpGU", BindingFlags.Static | BindingFlags.NonPublic) ?? throw new Exception("cannot find check generate method");
+        }
+        public DXVision.DXTableManager read_dat(string dat_name)
+        {
+            ZipSerializer.Current.Password = get_dat_pswd(dat_name);
+            return (DXVision.DXTableManager)ZipSerializer.Read(Path.Combine(tab_folder, Path.GetFileNameWithoutExtension(dat_name) + ".dat"));
+        }
+
+        public string get_save_pswd(string save_path)
+        {
+            pswd_gen_method.Invoke(null, new object[] { save_path, 2, false });
+            return ZipSerializer.Current.Password;
+        }
+
+        public string get_dat_pswd(string dat_path)
+        {
+            var pswd = DXVision.DXHelper_HashCode.From(Path.GetFileNameWithoutExtension(dat_path) + ".dat").ToString();
+            pswd += DXVision.DXHelper_HashCode.From(pswd).ToString();
+            pswd += DXVision.DXHelper_HashCode.From(pswd).ToString();
+            return pswd;
+        }
+        public void generate_check(string save_path)
+        {
+            File.WriteAllText(Path.ChangeExtension(save_path, ".zxcheck"), check_gen_method.Invoke(null, new object[] { save_path, 2 }).ToString());
+        }
+        public void unpack(string save_path, bool IsSave)
+        {
+            var target_path = Path.Combine(Path.GetDirectoryName(save_path), Path.GetFileNameWithoutExtension(save_path));
+            var t = new Ionic.Zip.ZipFile(save_path);
+            t.Password = IsSave ? get_save_pswd(save_path) : get_dat_pswd(save_path);
+            t.ExtractAll(target_path, Ionic.Zip.ExtractExistingFileAction.OverwriteSilently);
+        }
+
+        public void pack(string folder_path, bool IsSave)
+        {
+            var target_path = Path.ChangeExtension(folder_path.TrimEnd(Path.DirectorySeparatorChar), IsSave ? ".zxsav" : ".dat");
+            var t = new Ionic.Zip.ZipFile();
+            t.Password = IsSave ? get_save_pswd(folder_path) : get_dat_pswd(folder_path);
+            t.AddDirectory(folder_path);
+            t.Save(target_path);
+            if (IsSave) generate_check(target_path);
+        }
     }
     public class BaseOptionWithSaveNameOrPath : BaseOption
     {
         [Value(0, Required = true, MetaName = "save_name_or_path")]
         public string save_name_or_path { get; set; }
 
+        public override void Run()
+        {
+            base.Run();
+            save_name_or_path = Path.IsPathRooted(save_name_or_path) ? save_name_or_path : Path.Combine(save_folder, Path.GetFileNameWithoutExtension(save_name_or_path) + ".zxsav");
+        }
+        public void ManipulateData(Action<XmlDocument> action)
+        {
+            var zipfile = new ZipFile(save_name_or_path) { Password = get_save_pswd(save_name_or_path) };
+            var zipentry = zipfile["Data"];
+            MemoryStream memoryStream = new MemoryStream();
+            zipentry.Extract(memoryStream);
+            memoryStream.Seek(0, SeekOrigin.Begin);
+            XmlDocument xmlDocument = new XmlDocument();
+            xmlDocument.Load(memoryStream);
+            action(xmlDocument);
+            memoryStream = new MemoryStream();
+            xmlDocument.Save(memoryStream);
+            memoryStream.Seek(0, SeekOrigin.Begin);
+            zipfile.UpdateEntry("Data", memoryStream);
+            zipfile.Save();
+            generate_check(save_name_or_path);
+        }
+
     }
     public class BaseOptionWithDatNameOrPath : BaseOption
     {
         [Value(0, Required = true, MetaName = "dat_name_or_path")]
         public string dat_name_or_path { get; set; }
+        public override void Run()
+        {
+            base.Run();
+            dat_name_or_path = Path.IsPathRooted(dat_name_or_path) ? dat_name_or_path : Path.Combine(tab_folder, Path.GetFileNameWithoutExtension(dat_name_or_path) + ".dat");
+        }
     }
     public class BaseOptionWithSaveFolderNameOrPath : BaseOption
     {
         [Value(0, Required = true, MetaName = "save_folder_name_or_path")]
         public string save_folder_name_or_path { get; set; }
+        public override void Run()
+        {
+            base.Run();
+            save_folder_name_or_path = Path.IsPathRooted(save_folder_name_or_path) ? save_folder_name_or_path : Path.Combine(save_folder, save_folder_name_or_path);
+        }
     }
     public class BaseOptionWithDatFolderNameOrPath : BaseOption
     {
         [Value(0, Required = true, MetaName = "dat_folder_name_or_path")]
         public string dat_folder_name_or_path { get; set; }
+        public override void Run()
+        {
+            base.Run();
+            dat_folder_name_or_path = Path.IsPathRooted(dat_folder_name_or_path) ? dat_folder_name_or_path : Path.Combine(tab_folder, dat_folder_name_or_path);
+        }
     }
 
     [Verb("reset", HelpText = "read the save, delete all researched technology, add coresponding research points and write back to save.")]
@@ -46,6 +159,16 @@ namespace TAB_researchtreereset
         public static IEnumerable<Example> Examples
         {
             get => new List<Example>() { new Example(typeof(resetOption).GetCustomAttribute<VerbAttribute>().HelpText + '\n', new resetOption { save_name_or_path = "<save_name_or_path>" }) };
+        }
+
+        public override void Run()
+        {
+            base.Run();
+            ManipulateData(xmlDocument =>
+            {
+                xmlDocument.SelectSingleNode("//Collection[@name=\"IDResearchsRecentUnlocked\"]").InnerXml = xmlDocument.SelectSingleNode("//Collection[@name=\"IDResearchUnlocked\"]").InnerXml;
+            });
+            return;
         }
     }
 
@@ -57,6 +180,15 @@ namespace TAB_researchtreereset
         {
             get => new List<Example>() { new Example(typeof(resetperkOption).GetCustomAttribute<VerbAttribute>().HelpText + '\n', new resetperkOption { save_name_or_path = "<save_name_or_path>" }) };
         }
+        public override void Run()
+        {
+            base.Run();
+            ManipulateData(xmlDocument =>
+            {
+                xmlDocument.SelectSingleNode("//Collection[@name=\"HeroPerksTakenNow\"]").InnerXml = xmlDocument.SelectSingleNode("//Collection[@name=\"HeroPerksTaken\"]").InnerXml;
+            });
+            return;
+        }
     }
     [Verb("gencheck", HelpText = "generate .zxcheck for specific file")]
     public class gencheckOption : BaseOptionWithSaveNameOrPath
@@ -66,10 +198,26 @@ namespace TAB_researchtreereset
         {
             get => new List<Example>() { new Example(typeof(gencheckOption).GetCustomAttribute<VerbAttribute>().HelpText + '\n', new gencheckOption { save_name_or_path = "<save_name_or_path>" }) };
         }
+        public override void Run()
+        {
+            base.Run();
+
+            generate_check(save_name_or_path);
+        }
     }
 
     [Verb("genpswd", HelpText = "generate all password of saves(*.zxsave) in savepswd.json, and generate all password of game data file(*.dat) in datpswd.json")]
-    public class genpswdOption : BaseOption { }
+    public class genpswdOption : BaseOption
+    {
+        public override void Run()
+        {
+            base.Run();
+
+
+            File.WriteAllText("savepswd.json", Newtonsoft.Json.JsonConvert.SerializeObject(Directory.EnumerateFiles(save_folder, "*.zxsav").ToDictionary(Path.GetFileName, get_save_pswd), Newtonsoft.Json.Formatting.Indented));
+            File.WriteAllText("datpswd.json", Newtonsoft.Json.JsonConvert.SerializeObject(Directory.EnumerateFiles(tab_folder, "*.dat").ToDictionary(Path.GetFileName, get_dat_pswd), Newtonsoft.Json.Formatting.Indented));
+        }
+    }
 
     [Verb("unpacksave", HelpText = "unzip save(.zxsav) to a same name folder")]
     public class unpacksaveOption : BaseOptionWithSaveNameOrPath
@@ -79,6 +227,12 @@ namespace TAB_researchtreereset
         public static IEnumerable<Example> Examples
         {
             get => new List<Example>() { new Example(typeof(unpacksaveOption).GetCustomAttribute<VerbAttribute>().HelpText + '\n', new unpacksaveOption { save_name_or_path = "<save_name_or_path>" }) };
+        }
+        public override void Run()
+        {
+            base.Run();
+
+            unpack(save_name_or_path, true);
         }
     }
 
@@ -90,6 +244,12 @@ namespace TAB_researchtreereset
         {
             get => new List<Example>() { new Example(typeof(unpackdatOption).GetCustomAttribute<VerbAttribute>().HelpText + '\n', new unpackdatOption { dat_name_or_path = "<dat_name_or_path>" }) };
         }
+        public override void Run()
+        {
+            base.Run();
+
+            unpack(dat_name_or_path, false);
+        }
     }
 
     [Verb("packsave", HelpText = "zip folder to a same name .zxsav file with proper password, and generate .zxcheck")]
@@ -100,6 +260,12 @@ namespace TAB_researchtreereset
         {
             get => new List<Example>() { new Example(typeof(packsaveOption).GetCustomAttribute<VerbAttribute>().HelpText + '\n', new packsaveOption { save_folder_name_or_path = "<save_folder_name_or_path>" }) };
         }
+        public override void Run()
+        {
+            base.Run();
+
+            pack(save_folder_name_or_path, true);
+        }
     }
 
     [Verb("packdat", HelpText = "zip folder to a same name .dat file with proper password")]
@@ -109,6 +275,12 @@ namespace TAB_researchtreereset
         public static IEnumerable<Example> Examples
         {
             get => new List<Example>() { new Example(typeof(packdatOption).GetCustomAttribute<VerbAttribute>().HelpText + '\n', new packdatOption { dat_folder_name_or_path = "<dat_folder_name_or_path>" }) };
+        }
+        public override void Run()
+        {
+            base.Run();
+
+            pack(dat_folder_name_or_path, false);
         }
     }
 
@@ -140,7 +312,7 @@ namespace TAB_researchtreereset
                 Console.WriteLine("Input the name of save for research tree reseting");
                 var name = Console.ReadLine().Trim();
                 if (string.IsNullOrEmpty(name)) throw new ArgumentNullException();
-                Run(new resetOption { save_name_or_path = name });
+                new resetOption { save_name_or_path = name }.Run();
                 Console.WriteLine("Succeeded. Press any key to continue");
                 Console.ReadKey();
                 return;
@@ -149,157 +321,8 @@ namespace TAB_researchtreereset
             {
                 //command line mode
                 Parser parser = Parser.Default;
-                parser.ParseArguments(args, Assembly.GetExecutingAssembly().GetTypes().Where(t => t.GetCustomAttribute<VerbAttribute>() != null).ToArray()).WithParsed(Run).WithNotParsed(e => Console.WriteLine());
+                parser.ParseArguments(args, Assembly.GetExecutingAssembly().GetTypes().Where(t => t.GetCustomAttribute<VerbAttribute>() != null).ToArray()).WithParsed((BaseOption o) => o.Run()).WithNotParsed(e => Console.WriteLine());
             }
-        }
-
-        private static void Run(object obj)
-        {
-            init((BaseOption)obj);
-            switch (obj)
-            {
-                case resetOption o:
-                    reset_research_tree(o.save_name_or_path);
-                    break;
-                case resetperkOption o:
-                    reset_hero_perk(o.save_name_or_path);
-                    break;
-                case genpswdOption _:
-                    generate_password();
-                    break;
-                case gencheckOption o:
-                    generate_check(o.save_name_or_path);
-                    break;
-                case unpacksaveOption o:
-                    unpack(o.save_name_or_path, true);
-                    break;
-                case unpackdatOption o:
-                    unpack(o.dat_name_or_path, false);
-                    break;
-                case packsaveOption o:
-                    pack(o.save_folder_name_or_path, true);
-                    break;
-                case packdatOption o:
-                    pack(o.dat_folder_name_or_path, false);
-                    break;
-            }
-        }
-        static BaseOption baseOption;
-        private static void init(BaseOption opt)
-        {
-            try
-            {
-                if (string.IsNullOrEmpty(opt.tab_folder))
-                    opt.tab_folder = Path.Combine((string)Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Valve\Steam").GetValue("SteamPath"), @"steamapps\common\They Are Billions\");
-                if (!Directory.Exists(opt.tab_folder)) throw new DirectoryNotFoundException(opt.tab_folder);
-            }
-            catch (Exception e)
-            {
-                throw new Exception("cannot find TAB folder automatically\n consider specify TAB folder\n use \"TABRTreset help\" to get more help\n" + e.ToString(), e);
-            }
-            try
-            {
-                if (string.IsNullOrEmpty(opt.save_folder))
-                    opt.save_folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), @"My Games\They Are Billions\Saves\");
-                if (!Directory.Exists(opt.save_folder)) throw new DirectoryNotFoundException(opt.save_folder);
-            }
-            catch (Exception e) { throw new Exception("cannot find save folder automatically\n consider specify save folder\n use \"TABRTreset help\" to get more help\n" + e.ToString(), e); }
-
-
-            // TODO search for methods in TAB executive using method signatures & IL code instead of method names for backward compatibility
-            var tab_asmb = Assembly.LoadFrom(Path.Combine(opt.tab_folder, "TheyAreBillions.exe"));
-            var serializer_class = tab_asmb.GetType("#=zBitRis$e$O2Cn5vz3w==");
-            opt.pswd_gen_method = serializer_class.GetMethod("#=zAmh0ZrvDqn3lwW$PWQ==", BindingFlags.Static | BindingFlags.NonPublic) ?? throw new Exception("cannot find password generate method");
-            opt.check_gen_method = serializer_class.GetMethod("#=zPYy9RcqnMpGU", BindingFlags.Static | BindingFlags.NonPublic) ?? throw new Exception("cannot find check generate method");
-
-            baseOption = opt;
-
-            if (opt is BaseOptionWithSaveNameOrPath o)
-                o.save_name_or_path = Path.IsPathRooted(o.save_name_or_path) ? o.save_name_or_path : Path.Combine(o.save_folder, Path.GetFileNameWithoutExtension(o.save_name_or_path) + ".zxsav");
-            else if (opt is BaseOptionWithDatNameOrPath odat)
-                odat.dat_name_or_path = Path.IsPathRooted(odat.dat_name_or_path) ? odat.dat_name_or_path : Path.Combine(odat.tab_folder, Path.GetFileNameWithoutExtension(odat.dat_name_or_path) + ".dat");
-            else if (opt is BaseOptionWithSaveFolderNameOrPath osavefolder)
-                osavefolder.save_folder_name_or_path = Path.IsPathRooted(osavefolder.save_folder_name_or_path) ? osavefolder.save_folder_name_or_path : Path.Combine(osavefolder.save_folder, osavefolder.save_folder_name_or_path);
-            else if (opt is BaseOptionWithDatFolderNameOrPath odatfolder)
-                odatfolder.dat_folder_name_or_path = Path.IsPathRooted(odatfolder.dat_folder_name_or_path) ? odatfolder.dat_folder_name_or_path : Path.Combine(odatfolder.tab_folder, odatfolder.dat_folder_name_or_path);
-        }
-        static void generate_password()
-        {
-            File.WriteAllText("savepswd.json", Newtonsoft.Json.JsonConvert.SerializeObject(Directory.EnumerateFiles(baseOption.save_folder, "*.zxsav").ToDictionary(Path.GetFileName, get_save_pswd), Newtonsoft.Json.Formatting.Indented));
-            File.WriteAllText("datpswd.json", Newtonsoft.Json.JsonConvert.SerializeObject(Directory.EnumerateFiles(baseOption.tab_folder, "*.dat").ToDictionary(Path.GetFileName, get_dat_pswd), Newtonsoft.Json.Formatting.Indented));
-        }
-        static DXVision.DXTableManager read_dat(string dat_name)
-        {
-            ZipSerializer.Current.Password = get_dat_pswd(dat_name);
-            return (DXVision.DXTableManager)ZipSerializer.Read(Path.Combine(baseOption.tab_folder, Path.GetFileNameWithoutExtension(dat_name) + ".dat"));
-        }
-        static void reset_research_tree(string save_path)
-        {
-            var research_point_dict = read_dat("ZXCampaign").Tables["Researchs"].Rows.ToDictionary(p => p.Key, p => int.Parse(p.Value[1]));
-            ZipSerializer.Current.Password = get_save_pswd(save_path);
-            var zxgamestate = ZipSerializer.Read(save_path, "Data");
-            var zxcampaignstate = zxgamestate.GetProperty("CampaignState");
-
-            zxcampaignstate.ModifyProperties(prop_dict => new Dictionary<string, object>()
-            {
-                ["IDResearchUnlocked"] = new List<string>(),
-                ["IDResearchsRecentUnlocked"] = new List<string>(),
-                ["ResearchPoints"] = (int)prop_dict["ResearchPoints"] + ((List<string>)prop_dict["IDResearchUnlocked"]).Sum(r => research_point_dict[r])
-            });
-
-            ZipSerializer.Write(save_path, "Data", zxgamestate);
-            generate_check(save_path);
-        }
-        static void reset_hero_perk(string save_path)
-        {
-            ZipSerializer.Current.Password = get_save_pswd(save_path);
-            var zxgamestate = ZipSerializer.Read(save_path, "Data");
-            var zxcampaignstate = zxgamestate.GetProperty("CampaignState");
-
-            zxcampaignstate.ModifyProperties(prop_dict => new Dictionary<string, object>()
-            {
-                ["HeroPerksTaken"] = new List<string>(),
-                ["HeroPerksAvailable"] = (int)prop_dict["HeroPerksAvailable"] + ((List<string>)prop_dict["HeroPerksTaken"]).Count,
-                ["HeroPerksTakenNow"] = new List<string>()
-            });
-
-            ZipSerializer.Write(save_path, "Data", zxgamestate);
-            generate_check(save_path);
-        }
-
-        static string get_save_pswd(string save_path)
-        {
-            baseOption.pswd_gen_method.Invoke(null, new object[] { save_path, 2, false });
-            return ZipSerializer.Current.Password;
-        }
-
-        static string get_dat_pswd(string dat_path)
-        {
-            var pswd = DXVision.DXHelper_HashCode.From(Path.GetFileNameWithoutExtension(dat_path) + ".dat").ToString();
-            pswd += DXVision.DXHelper_HashCode.From(pswd).ToString();
-            pswd += DXVision.DXHelper_HashCode.From(pswd).ToString();
-            return pswd;
-        }
-        static void generate_check(string save_path)
-        {
-            File.WriteAllText(Path.ChangeExtension(save_path, ".zxcheck"), baseOption.check_gen_method.Invoke(null, new object[] { save_path, 2 }).ToString());
-        }
-        static void unpack(string save_path, bool IsSave)
-        {
-            var target_path = Path.Combine(Path.GetDirectoryName(save_path), Path.GetFileNameWithoutExtension(save_path));
-            var t = new Ionic.Zip.ZipFile(save_path);
-            t.Password = IsSave ? get_save_pswd(save_path) : get_dat_pswd(save_path);
-            t.ExtractAll(target_path, Ionic.Zip.ExtractExistingFileAction.OverwriteSilently);
-        }
-
-        static void pack(string folder_path, bool IsSave)
-        {
-            var target_path = Path.ChangeExtension(folder_path.TrimEnd(Path.DirectorySeparatorChar), IsSave ? ".zxsav" : ".dat");
-            var t = new Ionic.Zip.ZipFile();
-            t.Password = IsSave ? get_save_pswd(folder_path) : get_dat_pswd(folder_path);
-            t.AddDirectory(folder_path);
-            t.Save(target_path);
-            if (IsSave) generate_check(target_path);
         }
     }
 }
