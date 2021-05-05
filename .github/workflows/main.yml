@@ -38,10 +38,10 @@ jobs:
       - name: Upload a Build Artifact
         uses: actions/upload-artifact@v2.2.3
         with:
-          path: bin\Release
+          path: bin
           name: Release.zip
           
-      - run: tar -caf Release.zip -C bin\Release *
+      - run: tar -caf Release.zip -C bin *
       
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@v2
