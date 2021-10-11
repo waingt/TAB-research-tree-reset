@@ -1,0 +1,53 @@
+﻿<Window x:Class="TABresetGUI.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:TABresetGUI" 
+        xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+        mc:Ignorable="d"
+        Title="TABResetGUI" Height="500" Width="700">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="2*"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="2*"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+        <ListView Name="listview1">
+            <ListView.View>
+                <GridView>
+                    <GridViewColumn DisplayMemberBinding="{Binding Name}" Header="存档名" Width="150"/>
+                    <GridViewColumn DisplayMemberBinding="{Binding LastWrite}" Header="最后写入" Width="200" />
+                </GridView>
+            </ListView.View>
+        </ListView>
+        <Grid Grid.Column="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <Button Style="{StaticResource MaterialDesignRaisedButton}" Content="打开存档目录" Tag="opensavefolder" Click="Button_Click"/>
+            <Button Grid.Row="1" Style="{StaticResource MaterialDesignRaisedButton}" ToolTip="将所有科技设为可取消（绿字）" Content="重置科技树" Tag="reset" Click="Button_Click"/>
+            <Button Grid.Row="2" Style="{StaticResource MaterialDesignRaisedButton}" ToolTip="将所有英雄点数设为可取消（绿字）" Content="重置英雄点数" Tag="resetperk"  Click="Button_Click"/>
+            <Button Grid.Row="3" Style="{StaticResource MaterialDesignRaisedButton}" Content="生成.zxcheck文件" Tag="gencheck" Click="Button_Click"/>
+            <Button Grid.Row="4" Style="{StaticResource MaterialDesignRaisedButton}" ToolTip="为所有存档和.dat文件生成解压密码，保存为JSON文件" Content="生成密码" Tag="genpswd" Click="Button_Click"/>
+            <Button Grid.Row="5" Style="{StaticResource MaterialDesignRaisedButton}" ToolTip="将所选的存档解包" Content="解包存档" Tag="unpacksave" Click="Button_Click"/>
+            <Button Grid.Row="6" Style="{StaticResource MaterialDesignRaisedButton}" ToolTip="将所选的.dat文件解包" Content="解包.dat" Tag="unpackdat" Click="Button_Click"/>
+            <Button Grid.Row="7" Style="{StaticResource MaterialDesignRaisedButton}" ToolTip="将所选的存档打包" Content="打包存档" Tag="packsave" Click="Button_Click"/>
+            <Button Grid.Row="8" Style="{StaticResource MaterialDesignRaisedButton}" ToolTip="将所选的.dat文件打包" Content="打包.dat" Tag="packdat" Click="Button_Click"/>
+            <Button Grid.Row="9" Style="{StaticResource MaterialDesignRaisedButton}" Content="关于" Tag="about" Click="Button_Click"/>
+        </Grid>
+        <TextBox Name="console" Grid.Row="1" Grid.ColumnSpan="2" TextWrapping="WrapWithOverflow" VerticalAlignment="Stretch" VerticalScrollBarVisibility="Auto" IsReadOnly="True" />
+    </Grid>
+</Window>

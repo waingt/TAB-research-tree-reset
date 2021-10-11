@@ -1,30 +1,23 @@
-```
-TABRTreset 1.0.0.0
 TABRTreset is a tool to crack encryption mechanism in game They Are Billions.
-The initial purpose of it is to reset research tree. In fact its fullname is They Are Billions research tree reset.
-Currently works on Steam Editon V.1.1.3. It ensures no backward compatibility.
 
-Usage:
+The initial purpose of it is to reset research tree of TAB save. In fact, it can currently be used for tech tree and hero point reset, get password, unpack and pack any save and DAT files and so on.
 
-  reset <save_name_or_path>         read the save, delete all researched technology, add coresponding research points 
-                                    and write back to save.
+Currently works on Steam Editon V.1.1.3. It does not guarantee that it will still work after game update.
 
-  gencheck <save_name_or_path>      generate .zxcheck for specific file
+You can get the program files through Github Releases or Steam Workshop
 
-  genpswd                           generate all password of saves(.zxsave) in savepswd.json, and generate all password 
-                                    of game data file(.dat) in datpswd.json
+It is recommended to use Github Issues or Workshop comment section to report bugs.
 
-  unpacksave <save_name_or_path>    unzip save(.zxsav) to a same name folder
+Usage: Unzip the. zip file into the games folder. You can get detailed help by executing TABRTreset.exe help from the command line.
 
-  unpackdat <save_name_or_path>     unzip data(.dat) to a same name folder
+TABRTreset 是一个破解亿万僵尸加密机制的工具
 
-  packsave <folder_name_or_path>    zip folder to a same name .zxsav file with proper password, and generate .zxcheck
+它的最初目的是重置亿万僵尸存档的科技树。实际上它目前可以用于科技树和英雄点重置、获取密码、解包和打包任意存档和dat文件等等用途。
 
-  packdat <folder_name_or_path>     zip folder to a same name .dat file with proper password
+目前可用于Steam Editon V.1.1.3版本，它不保证游戏更新后仍能工作
 
-  --save_folder                     specify the path to save folder, default: (MyDocuments)\My Games\They Are
-                                    Billions\Saves\
+你可以通过Github Releases或者Steam 创意工坊获取程序文件
 
-  --tab_folder                      specify the path to TAB game folder, default: (Steam installtion
-                                    path)\steamapps\common\They Are Billions\
-```
+建议使用Github Issues或创意工坊评论区报告bug
+
+用法: 将.zip文件解压缩到游戏文件夹，你可以用命令行执行TABRTreset.exe help来获取详细帮助或使用TABresetGUI.exe
